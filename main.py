@@ -35,7 +35,7 @@ while True:
         args = FindArgs(funcname, call_imports, proj)
         print(args)
 
-        if funcname == 'puts' or funcname == 'WriteFile':
+        if funcname == 'puts' or funcname == 'WriteFile' or 'printf' in funcname:
 
             binary = lief.parse(filename)
 
