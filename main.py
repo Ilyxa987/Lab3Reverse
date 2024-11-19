@@ -1,28 +1,8 @@
 from StaticTableImports import *
-import sys
-
-filename = input("Введите название файла:\n")
-
-""" Загрузка файла """
-proj = angr.Project(filename, load_options={'auto_load_libs': False})
-
-lib = [hex(x.rebased_addr) for x in proj.loader.main_object.imports.values()]  # Загрузка таблицы импортов
-print(lib)
-""""""
-
-""" Статическая загрузка всех адресов, где вызываются импортные функции """
-call_imports = GetStaticImportAdderess(proj)
-
-for key, value in call_imports.items():
-    index = lib.index(hex(int(value, 0)))
-    print(f"  0x{key:x} in lib", list(proj.loader.main_object.imports.keys())[index])
-""""""
-
-print(call_imports)
 
 while True:
     funcnumber = int(input(
-        'Введите номер функции:\n1. Узнать аргументы\n2. Дойти до адреса(Нужен сурс)\n3. Узнать сурс\n 4. Test optopn\n'))
+        'Введите номер функции:\n1. Узнать аргументы\n2. Дойти до адреса(Нужен сурс)\n3. Узнать сурс\n4. Test optiopn\n'))
 
     if funcnumber == 1:
         funcname = input('Введите название функции:\n')
@@ -30,9 +10,7 @@ while True:
         print(args)
 
         if funcname == 'puts' or funcname == 'WriteFile':
-
             binary = lief.parse(filename)
-
             addri = 1
             for addr in args:
                 print(addri, end='. ')

@@ -3,6 +3,9 @@ from angrutils import *
 import lief
 import sys
 
+
+
+
 #proj = angr.Project("test1.exe", arch='x86_64', load_options={'auto_load_libs': True})
 
 def GetStaticImportAdderess(p : angr.Project):
@@ -25,6 +28,30 @@ def GetStaticImportAdderess(p : angr.Project):
                         call_addresses.__setitem__(ins_addr, i)
                         break
     return call_addresses
+
+import sys
+
+filename = input("Введите название файла:\n")
+
+""" Загрузка файла """
+proj = angr.Project(filename, load_options={'auto_load_libs': False})
+
+lib = [hex(x.rebased_addr) for x in proj.loader.main_object.imports.values()]  # Загрузка таблицы импортов
+print(lib)
+""""""
+
+""" Статическая загрузка всех адресов, где вызываются импортные функции """
+call_imports = GetStaticImportAdderess(proj)
+call_imports_dict={}
+for key, value in call_imports.items():
+    index = lib.index(hex(int(value, 0)))
+    print(f"  0x{key:x} in lib", list(proj.loader.main_object.imports.keys())[index])
+    call_imports_dict[list(proj.loader.main_object.imports.keys())[index]]=key
+""""""
+try:
+    print(call_imports_dict['__stdio_common_vfprintf'])
+except:
+    pass
 
  # for key, value in call_addresses.items():
     #     index = lib.index(hex(int(value, 0)))
@@ -52,22 +79,17 @@ def FindArgs(funcname:str, call_addresses:dict, proj:angr.Project):
 
 def FindArgs1( proj:angr.Project):
     lib = proj.loader.main_object.imports
-    addr = lib["__stdio_common_vfprintf"]
+    addr = call_imports_dict['__stdio_common_vfprintf']
     cfg = proj.analyses.CFGFast()
     cfg.normalize()
     arguments = list()
     #binary = lief.parse("test1.exe")
     for func_node in cfg.functions.values():
-        print(hex(func_node.addr), hex(func_node.addr + func_node.size))
-        if addr in [hex(func_node.addr), hex(func_node.addr + func_node.size)]:
+        print(hex(addr), hex(func_node.addr), hex(func_node.addr + func_node.size))
+        # print(addr, [func_node.addr, func_node.addr + func_node.size])
+        if addr in range(func_node.addr, func_node.addr + func_node.size):
             print("I found printf!")
 
-        # for block in func_node.blocks:
-        #     if key >= block.addr and key <= block.addr + block.size:
-        #         insns = block._project.analyses.Disassembly(ranges=[(block.addr, block.addr + block.size)], thumb=block.thumb,block_bytes=block.bytes).raw_result_map["instructions"]
-        #         for i in range(len(insns.values())-1, -1, -1):
-        #             if (funcname == 'puts' or funcname == 'gets_s') and 'rcx' in str(list(insns.values())[i].render()) or funcname == 'WriteFile' and 'rdx' in str(list(insns.values())[i].render()):
-        #                 arguments.append(str(list(insns.values())[i].render()).split('[')[2].split(']')[0])
     return arguments
 
 def getaddrsource(proj: angr.Project, sourcefunc: int):
