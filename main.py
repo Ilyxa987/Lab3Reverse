@@ -1,11 +1,4 @@
-import angr
-import monkeyhex
-from triton import *
-from angrutils import *
-import lief
-import claripy
 from StaticTableImports import *
-
 import sys
 
 filename = input("Введите название файла:\n")
@@ -13,7 +6,7 @@ filename = input("Введите название файла:\n")
 """ Загрузка файла """
 proj = angr.Project(filename, load_options={'auto_load_libs': False})
 
-lib = [hex(x.rebased_addr) for x in proj.loader.main_object.imports.values()] # Загрузка таблицы импортов
+lib = [hex(x.rebased_addr) for x in proj.loader.main_object.imports.values()]  # Загрузка таблицы импортов
 print(lib)
 """"""
 
@@ -28,7 +21,8 @@ for key, value in call_imports.items():
 print(call_imports)
 
 while True:
-    funcnumber = int(input('Введите номер функции:\n1. Узнать аргументы\n2. Дойти до адреса(Нужен сурс)\n3. Узнать сурс\n'))
+    funcnumber = int(input(
+        'Введите номер функции:\n1. Узнать аргументы\n2. Дойти до адреса(Нужен сурс)\n3. Узнать сурс\n 4. Test optopn\n'))
 
     if funcnumber == 1:
         funcname = input('Введите название функции:\n')
@@ -57,12 +51,14 @@ while True:
     elif funcnumber == 3:
         sourceaddr = int(str(input('Введите адрес сурса\n')), 0)
         getaddrsource(proj, sourceaddr)
+    elif funcnumber == 4:
+        args = FindArgs1(proj)
     else:
         break
 
-#print(proj.loader)
+# print(proj.loader)
 
-#print(proj.loader.all_objects)
+# print(proj.loader.all_objects)
 
 # print(proj.loader.main_object)
 #
@@ -94,7 +90,7 @@ obj.imports["puts"]
 
 get_addr = obj.get_symbol('gets_s')
 
-put_addr = obj.imports['puts'].rebased_addr #Надо достать массив значений
+put_addr = obj.imports['puts'].rebased_addr  # Надо достать массив значений
 # По адресам коллов находить функции из импорта
 
 # binary = lief.parse("test1.exe")
@@ -117,7 +113,6 @@ put_addr = obj.imports['puts'].rebased_addr #Надо достать масси�
 #         instr1 = instr
 
 
-
 # state = proj.factory.blank_state(addr=0x140000000)
 #
 # state = proj.factory.call_state(0x140001000)
@@ -128,7 +123,7 @@ put_addr = obj.imports['puts'].rebased_addr #Надо достать масси�
 # def ok(state):
 #     print("asjfhbdhbsdhfbghjsdfg")
 
-#simgr = proj.factory.simulation_manager(state)
+# simgr = proj.factory.simulation_manager(state)
 
 # while simgr.active:
 #     for state1 in simgr.active:
@@ -150,7 +145,6 @@ put_addr = obj.imports['puts'].rebased_addr #Надо достать масси�
 #
 #
 # proj.execute(state)
-
 
 
 # binary = lief.parse("test1.exe")
