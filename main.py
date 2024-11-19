@@ -8,8 +8,10 @@ from StaticTableImports import *
 
 import sys
 
+filename = input("Введите название файла:\n")
+
 """ Загрузка файла """
-proj = angr.Project("test1.exe", load_options={'auto_load_libs': False})
+proj = angr.Project(filename, load_options={'auto_load_libs': False})
 
 lib = [hex(x.rebased_addr) for x in proj.loader.main_object.imports.values()] # Загрузка таблицы импортов
 print(lib)
@@ -25,22 +27,38 @@ for key, value in call_imports.items():
 
 print(call_imports)
 
-args = FindArgs('puts', call_imports, proj)
-print(args)
+while True:
+    funcnumber = int(input('Введите номер функции:\n1. Узнать аргументы\n2. Дойти до адреса(Нужен сурс)\n3. Узнать сурс\n'))
 
-binary = lief.parse("test1.exe")
+    if funcnumber == 1:
+        funcname = input('Введите название функции:\n')
+        args = FindArgs(funcname, call_imports, proj)
+        print(args)
 
-addri = 1
-for addr in args:
-    print(addri, end='. ')
-    for i in binary.get_content_from_virtual_address(int(addr, 0), 100):
-        if i == 0:
-            break
-        print(chr(i), end='')
-    print()
-    addri += 1
+        if funcname == 'puts' or funcname == 'WriteFile':
 
-Search(proj)
+            binary = lief.parse(filename)
+
+            addri = 1
+            for addr in args:
+                print(addri, end='. ')
+                for i in binary.get_content_from_virtual_address(int(addr, 0), 100):
+                    if i == 0:
+                        break
+                    print(chr(i), end='')
+                print()
+                addri += 1
+    elif funcnumber == 2:
+        findaddr = int(str(input("Введите адрес\n")), 0)
+        finsource = int(str(input('Введите адрес сурса\n')), 0)
+        lensource = int(str(input('Введите длину\n')), 0)
+        Search(proj, findaddr, finsource, lensource)
+
+    elif funcnumber == 3:
+        sourceaddr = int(str(input('Введите адрес сурса\n')), 0)
+        getaddrsource(proj, sourceaddr)
+    else:
+        break
 
 #print(proj.loader)
 
