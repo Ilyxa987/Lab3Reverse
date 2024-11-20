@@ -87,15 +87,15 @@ def FindArgs(funcname:str, call_addresses:dict, proj:angr.Project):
     return arguments
 
 def getaddrsource(proj: angr.Project, sourcefunc: int):
-    #initial_state = proj.factory.call_state(0x140001000)
-    initial_state = proj.factory.entry_state()
+    initial_state = proj.factory.call_state(0x140001000)
+    #initial_state = proj.factory.entry_state()
     initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
     initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
     simulation = proj.factory.simgr(initial_state)
     @proj.hook(sourcefunc)
     def ok(state: angr.SimState):
-        if proj.arch == 'x86_64':
-            print(state.mem[state.regs.rcx])
+        #if proj.arch == 'x86_64':
+        print(state.mem[state.regs.rcx])
         print(state.regs.edx)
         print(state.regs.eax)
         proj.terminate_execution()
@@ -105,8 +105,8 @@ def getaddrsource(proj: angr.Project, sourcefunc: int):
 
 def Search(project: angr.Project, findaddr:int, sourceaddr: int, len: int):
     # Start in main()
-    initial_state = project.factory.entry_state()
-    #initial_state = project.factory.call_state(0x140001000)
+    #initial_state = project.factory.entry_state()
+    initial_state = project.factory.call_state(0x140001000)
     initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
     initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
     symb_vector = claripy.BVS('input', len * 8)
@@ -124,7 +124,7 @@ def Search(project: angr.Project, findaddr:int, sourceaddr: int, len: int):
         return 'Correct'.encode() in stdout_output
 
     # Avoiding this address
-    avoid_address = 0x140001087
+    #avoid_address = 0x140001087
     #simulation.use_technique(angr.exploration_techniques.Explorer(find=good_address))
     #simulation.run()
     #@project.hook(0x140001043)

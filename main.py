@@ -27,6 +27,7 @@ for key, value in call_imports.items():
 
 print(call_imports)
 
+""" Основной цикл """
 while True:
     funcnumber = int(input('Введите номер функции:\n1. Узнать аргументы\n2. Дойти до адреса(Нужен сурс)\n3. Узнать сурс\n'))
 
