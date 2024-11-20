@@ -8,6 +8,7 @@ from StaticTableImports import *
 
 import sys
 
+
 filename = input("Введите название файла:\n")
 
 """ Загрузка файла """
