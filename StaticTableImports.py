@@ -82,7 +82,7 @@ def FindArgs(funcname:str, call_addresses:dict, proj:angr.Project):
                         if key >= block.addr and key <= block.addr + block.size:
                             insns = block._project.analyses.Disassembly(ranges=[(block.addr, block.addr + block.size)], thumb=block.thumb,block_bytes=block.bytes).raw_result_map["instructions"]
                             for i in range(len(insns.values())-1, -1, -1):
-                                if (funcname == 'puts' or funcname == 'gets_s') and 'rcx' in str(list(insns.values())[i].render()) or funcname == 'WriteFile' and 'rdx' in str(list(insns.values())[i].render()):
+                                if (funcname == 'puts' or funcname == 'gets_s') and 'rcx' in str(list(insns.values())[i].render()) or (funcname == 'WriteFile' or funcname == 'ReadFile') and 'rdx' in str(list(insns.values())[i].render()):
                                     arguments.append(str(list(insns.values())[i].render()).split('[')[2].split(']')[0])
     return arguments
 
@@ -96,8 +96,11 @@ def getaddrsource(proj: angr.Project, sourcefunc: int):
     def ok(state: angr.SimState):
         #if proj.arch == 'x86_64':
         print(state.mem[state.regs.rcx])
+        print(state.mem[state.regs.rdx])
+        print(state.regs.rdx)
         print(state.regs.edx)
         print(state.regs.eax)
+        print(state.regs.r8d)
         proj.terminate_execution()
 
     simulation.run()
@@ -111,27 +114,36 @@ def Search(project: angr.Project, findaddr:int, sourceaddr: int, len: int):
     initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
     symb_vector = claripy.BVS('input', len * 8)
     initial_state.memory.store(sourceaddr, symb_vector)
+
+    """TODO: Разобраться с эмулированием открытия файлов"""
+    # filename = 'example.txt'
+    # symbolic_file_size_bytes = 200
+    #
+    # # Create a BV which is going to be the content of the simbolic file
+    # password = claripy.BVS('123', symbolic_file_size_bytes * 8)
+    #
+    # # Create the file simulation with the simbolic content
+    # password_file = angr.storage.SimFile(filename, content=password)
+    #
+    # # Add the symbolic file we created to the symbolic filesystem.
+    # initial_state.fs.insert(filename, password_file)
+
     # Start simulation
     simulation = project.factory.simgr(initial_state)
+
 
 
     # Find the way yo reach the good address
     good_address = findaddr
 
-    def is_successful(state):
-        stdout_output = state.posix.dumps(sys.stdout.fileno())
-
-        return 'Correct'.encode() in stdout_output
 
     # Avoiding this address
     #avoid_address = 0x140001087
     #simulation.use_technique(angr.exploration_techniques.Explorer(find=good_address))
     #simulation.run()
-    #@project.hook(0x140001043)
-    def ok(state : angr.SimState):
-        print(state.mem[state.regs.rcx])
-        symb_vector = claripy.BVS('input', 15 * 8)
-        state.memory.store(0x7fffffffffeffb0, symb_vector)
+    # @project.hook(0x140001078)
+    # def ok(state : angr.SimState):
+    #     print(state.regs.rax)
 
     simulation.explore(find=good_address)
 
@@ -158,4 +170,4 @@ def Search(project: angr.Project, findaddr:int, sourceaddr: int, len: int):
         print(solution_state.solver.eval(symb_vector, cast_to=bytes))
         #print(solution_state.posix.dumps(sys.stdin.fileno()))
     else:
-        raise Exception('Could not find the solution')
+        print('Could not find the solution')
