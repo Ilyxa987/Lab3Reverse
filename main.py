@@ -1,20 +1,18 @@
+import winreg
+from winreg import HKEY_LOCAL_MACHINE
+
 import angr
-import monkeyhex
-from triton import *
-from angrutils import *
-import lief
 import claripy
-from StaticTableImports import *
+from StaticFind import *
+import pefile
+import angr.calling_conventions as cc
 
-import sys
-
-
-filename = input("Введите название файла:\n")
+filename = "test3.exe"
 
 """ Загрузка файла """
 proj = angr.Project(filename, load_options={'auto_load_libs': False})
 
-lib = [hex(x.rebased_addr) for x in proj.loader.main_object.imports.values()] # Загрузка таблицы импортов
+lib = [hex(x.rebased_addr) for x in proj.loader.main_object.imports.values()]  # Загрузка таблицы импортов
 print(lib)
 """"""
 
@@ -23,160 +21,58 @@ call_imports = GetStaticImportAdderess(proj)
 
 for key, value in call_imports.items():
     index = lib.index(hex(int(value, 0)))
-    print(f"  0x{key:x} in lib", list(proj.loader.main_object.imports.keys())[index])
+    """где вызывается - кого вызывает - куда идет """
+    print(f"  0x{key:x} in lib", list(proj.loader.main_object.imports.keys())[index], hex(int(value, 0)))
 """"""
 
 print(call_imports)
 
-""" Основной цикл """
-while True:
-    funcnumber = int(input('Введите номер функции:\n1. Узнать аргументы\n2. Дойти до адреса(Нужен сурс)\n3. Узнать сурс\n'))
+args = 0  # getaddrsource(proj,5368713274)
+print(args)
 
-    if funcnumber == 1:
-        funcname = input('Введите название функции:\n')
-        args = FindArgs(funcname, call_imports, proj)
-        print(args)
-
-        if funcname == 'puts' or funcname == 'WriteFile' or 'printf' in funcname:
-
-            binary = lief.parse(filename)
-
-            addri = 1
-            for addr in args:
-                print(addri, end='. ')
-                for i in binary.get_content_from_virtual_address(int(addr, 0), 100):
-                    if i == 0:
-                        break
-                    print(chr(i), end='')
-                print()
-                addri += 1
-    elif funcnumber == 2:
-        findaddr = int(str(input("Введите адрес\n")), 0)
-        finsource = int(str(input('Введите адрес сурса\n')), 0)
-        lensource = int(str(input('Введите длину\n')), 0)
-        Search(proj, findaddr, finsource, lensource)
-
-    elif funcnumber == 3:
-        sourceaddr = int(str(input('Введите адрес сурса\n')), 0)
-        getaddrsource(proj, sourceaddr)
-    else:
-        break
-
-#print(proj.loader)
-
-#print(proj.loader.all_objects)
-
-# print(proj.loader.main_object)
-#
-# print(proj.loader.kernel_object)
-#
-# print(proj.loader.shared_objects)
-#
-# print(proj.loader.extern_object)
-
-obj = proj.loader.main_object
-
-# print(obj.segments)
-#
-# print(obj.find_segment_containing(0x140001000))
-
-obj.imports["puts"]
-
-# print('%x' % obj.imports['puts'].rebased_addr)
-#
-# print(proj.loader.find_symbol('puts'))
-# print(proj.loader.find_symbol('puts'))
-# print(proj.loader.find_symbol('puts'))
-#
-# print(proj.loader.find_symbol('gets_s'))
-#
-# print('%x' % obj.get_symbol('puts').rebased_addr)
-#
-# print('%x' % obj.get_symbol('gets_s').rebased_addr)
-
-get_addr = obj.get_symbol('gets_s')
-
-put_addr = obj.imports['puts'].rebased_addr #Надо достать массив значений
-# По адресам коллов находить функции из импорта
-
-# binary = lief.parse("test1.exe")
-
-"""Проверка в статике"""
-# instr1 = None
-# for instr in proj.factory.fresh_block(0x140001000, 0xe1c).capstone.insns:
-#     mnem = instr.mnemonic
-#     if mnem == 'call':
-#         if 'rip' in str(instr.op_str):
-#             if (int(str(instr.op_str)[19:-1], 16) + instr.address + 6) == put_addr:
-#                 print('puts here: %x' % instr.address)
-#                 print('str here:', end=' ')
-#                 for i in binary.get_content_from_virtual_address(int(str(instr1.op_str)[14:-1], 16) + instr1.address + 7, 100):
-#                     if i == 0:
-#                         break
-#                     print(chr(i), end='')
-#                 print()
-#     if mnem == 'lea':
-#         instr1 = instr
+# Указываем адрес функции
+function_addr = 5368713274  # Замените на адрес функции
 
 
+initial_state = proj.factory.call_state(0x140001000)
 
-# state = proj.factory.blank_state(addr=0x140000000)
-#
-# state = proj.factory.call_state(0x140001000)
-# state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
-# state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
-#
-# @proj.hook(0x140001043)
-# def ok(state):
-#     print("asjfhbdhbsdhfbghjsdfg")
+initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
+initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
 
-#simgr = proj.factory.simulation_manager(state)
+symb_vector = claripy.BVS('input', 256 * 8)
+initial_state.memory.store(0x7FFFFFFFFFEFEC0, symb_vector)
 
-# while simgr.active:
-#     for state1 in simgr.active:
-#         print(state1.block().disassembly)
-#     simgr.step()
+proj.hook(int("0x14000103a", 0), hook_reg_open_key_exw, 6)
+proj.hook(int("0x14000106f", 0), hook_reg_query_value_exw, 6)
+proj.hook(int("0x1400010af", 0), hook_reg_get_value_w, 6)
+proj.hook(int("0x1400010ef", 0), hook_reg_set_value_exw, 6)
 
-# cfg = proj.analyses.CFGEmulated()
-# cfg.normalize()
-#
-#
-# for func_node in cfg.functions.values():
-#     print(func_node)
-#     for block in func_node.blocks:
-#         print('%x' % block.addr)
+#proj.hook(int("0x1400010B9", 0),hook_140001126,2)
+simulation = proj.factory.simgr(initial_state)
 
-# @proj.hook(0x140001043)
-# def ok(state):
-#     print("jkdshjfasdf")
-#
-#
-# proj.execute(state)
+simulation.explore(find=0x140001100)
 
-
-
-# binary = lief.parse("test1.exe")
-
-# print(str(binary.get_content_from_virtual_address(0x140002268, 10)))
-# print(proj.arch)
-#
-# print("0x%x" % proj.entry)
-#
-# print(proj.filename)
-#
-# print(proj.loader)
-#
-# print(proj.loader.shared_objects)
-#
-# function_manager = proj.kb.functions
-#
-# # Выводим адреса и имена функций
-# for func_addr, func in function_manager.values():
-#     print(f"Function address: {hex(func_addr)}, Name: {func.name}")
-
-# state = proj.factory.
-#
-# simgr = proj.factory.simulation_manager(state)
-#
-# for state in simgr.active:
-#     print(state.block().disassembly)
+# If found a way to reach the address
+if simulation.found:
+    solution_state = simulation.found[0]
+    win_sequence = ''
+    finishedTracing = False
+    for win_block in solution_state.history.bbl_addrs.hardcopy:
+        win_block = proj.factory.block(win_block)
+        addresses = win_block.instruction_addrs
+        for address in addresses:
+            win_sequence += 't:' + hex(address) + '\n'
+            if address == 0x140001100:
+                # Prevent sending the rest of the block addresses that aren't desired
+                finishedTracing = True
+                break
+        if finishedTracing:
+            break
+    win_sequence = win_sequence[:-1]
+    # print(win_sequence)
+    # Print the string that Angr wrote to stdin to follow solution_state
+    # print(solution_state.posix.dumps(1))
+    print(solution_state.solver.eval(symb_vector, cast_to=bytes))
+    # print(solution_state.posix.dumps(sys.stdin.fileno()))
+else:
+    print('Could not find the solution')
