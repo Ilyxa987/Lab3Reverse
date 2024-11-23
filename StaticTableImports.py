@@ -9,6 +9,7 @@ def GetStaticImportAdderess(p : angr.Project):
     lib = [hex(x.rebased_addr) for x in p.loader.main_object.imports.values()]
     call_addresses = {}
     cfg = p.analyses.CFGFast()
+    #cfg = p.analyses.CFGEmulated()
     cfg.normalize()
     for func_node in cfg.kb.functions.values():
         for block in func_node.blocks:
@@ -86,13 +87,14 @@ def FindArgs(funcname:str, call_addresses:dict, proj:angr.Project):
                                     arguments.append(str(list(insns.values())[i].render()).split('[')[2].split(']')[0])
     return arguments
 
-def getaddrsource(proj: angr.Project, sourcefunc: int):
+def getaddrsource(proj: angr.Project, sourcefunc: int, len: int):
     initial_state = proj.factory.call_state(0x140001000)
     #initial_state = proj.factory.entry_state()
     initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
     initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
     simulation = proj.factory.simgr(initial_state)
-    @proj.hook(sourcefunc)
+
+    @proj.hook(sourcefunc, length=len)
     def ok(state: angr.SimState):
         #if proj.arch == 'x86_64':
         print(state.mem[state.regs.rcx])
@@ -117,18 +119,18 @@ def Search(project: angr.Project, findaddr:int, sourceaddr: int, len: int):
 
     """TODO: Разобраться с эмулированием открытия файлов"""
     # filename = 'example.txt'
-    # symbolic_file_size_bytes = 200
-    #
-    # # Create a BV which is going to be the content of the simbolic file
+    # symbolic_file_size_bytes = 100
+    # #
+    # # # Create a BV which is going to be the content of the simbolic file
     # password = claripy.BVS('123', symbolic_file_size_bytes * 8)
-    #
-    # # Create the file simulation with the simbolic content
+    # #
+    # # # Create the file simulation with the simbolic content
     # password_file = angr.storage.SimFile(filename, content=password)
-    #
-    # # Add the symbolic file we created to the symbolic filesystem.
+    # #
+    # # # Add the symbolic file we created to the symbolic filesystem.
     # initial_state.fs.insert(filename, password_file)
-
-    # Start simulation
+    #
+    # # Start simulation
     simulation = project.factory.simgr(initial_state)
 
 

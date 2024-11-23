@@ -20,13 +20,16 @@ print(lib)
 
 """ Статическая загрузка всех адресов, где вызываются импортные функции """
 call_imports = GetStaticImportAdderess(proj)
+address_names = dict()
 
 for key, value in call_imports.items():
     index = lib.index(hex(int(value, 0)))
     print(f"  0x{key:x} in lib", list(proj.loader.main_object.imports.keys())[index])
+    address_names.update({key: list(proj.loader.main_object.imports.keys())[index]})
 """"""
 
 print(call_imports)
+print(address_names)
 
 """ Основной цикл """
 while True:
@@ -58,7 +61,10 @@ while True:
 
     elif funcnumber == 3:
         sourceaddr = int(str(input('Введите адрес сурса\n')), 0)
-        getaddrsource(proj, sourceaddr)
+        len = 0
+        if sourceaddr in address_names.keys():
+            if address_names[sourceaddr] == 'ReadFile': len = 6
+        getaddrsource(proj, sourceaddr, len)
     else:
         break
 
