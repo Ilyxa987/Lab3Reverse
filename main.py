@@ -4,6 +4,7 @@ from winreg import HKEY_LOCAL_MACHINE
 import angr
 import claripy
 from StaticFind import *
+from Hooks import *
 import pefile
 import angr.calling_conventions as cc
 
@@ -17,7 +18,7 @@ print(lib)
 """"""
 
 """ Статическая загрузка всех адресов, где вызываются импортные функции """
-call_imports = GetStaticImportAdderess(proj)
+call_imports = GetStaticImportAddress(proj)
 
 for key, value in call_imports.items():
     index = lib.index(hex(int(value, 0)))
@@ -35,7 +36,6 @@ function_addr = 5368713274  # Замените на адрес функции
 
 
 initial_state = proj.factory.call_state(0x140001000)
-
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
 
