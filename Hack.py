@@ -3,6 +3,11 @@ from StaticFind import *
 
 filename = "test3.exe"
 
+source = {"RegOpenKeyExW": [hook_reg_open_key_exw, 6], "RegQueryValueExW": [hook_reg_query_value_exw, 6],
+          "RegGetValueW": [hook_reg_get_value_w, 6], "RegSetValueExW": [hook_reg_set_value_exw, 6]}
+
+sink = {"RegSetValueExW": [hook_reg_set_value_exw, 6]}
+
 """ Загрузка файла """
 proj = angr.Project(filename, load_options={'auto_load_libs': False})
 
@@ -19,10 +24,13 @@ for key, value in call_imports.items():
     import_funcs.append([key, list(proj.loader.main_object.imports.keys())[index], value])
     # print(f"  0x{key:x} in lib", list(proj.loader.main_object.imports.keys())[index], hex(int(value, 0)))
 
-for i in import_funcs:
-    print(f"0x{i[0]:x}", i[1], hex(int(i[2], 0)))
+# for i in import_funcs:
+#     print(f"0x{i[0]:x}", i[1], hex(int(i[2], 0)))
 """"""
 
+
+# Мы смотрим сурсы все, реестры файлы похуй. Далее мы на все из них вешаем хуки и забираем адреса векторов.
+# Затем смотрим синки и идем до этих адресов, обработку херовых синков потом придумаем
 
 clear_encode()
 
@@ -31,12 +39,11 @@ initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
 
 symb_vector = claripy.BVS('input', 256 * 8)
-initial_state.memory.store(0x7FFFFFFFFFEFEC0, symb_vector)
+initial_state.memory.store(0x7FFFFFFFFFEFEc0, symb_vector)
 
-proj.hook(int("0x14000103a", 0), hook_reg_open_key_exw, 6)
-proj.hook(int("0x14000106f", 0), hook_reg_query_value_exw, 6)
-proj.hook(int("0x1400010af", 0), hook_reg_get_value_w, 6)
-proj.hook(int("0x1400010ef", 0), hook_reg_set_value_exw, 6)
+for i in import_funcs:
+    if i[1] in source.keys() or i[1] in sink.keys():
+        proj.hook(int(f"0x{i[0]:x}", 0), source[i[1]][0], source[i[1]][1])
 
 simulation = proj.factory.simgr(initial_state)
 
@@ -61,4 +68,6 @@ if simulation.found:
 else:
     print('Could not find the solution')
 
+
+encoded = ret_encode()
 print(encoded)

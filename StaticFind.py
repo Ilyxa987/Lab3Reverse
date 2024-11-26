@@ -73,7 +73,7 @@ def FindArgs(funcname: str, call_addresses: dict, proj: angr.Project):
                 # print(hex(func_node.addr), hex(func_node.addr + func_node.size))
                 if (('print' in funcname or 'scanf' in funcname) and
                         func_node.addr < key < func_node.addr + func_node.size):
-                    print(hex(func_node.addr))
+                    #print(hex(func_node.addr))
                     arguments = SearchFunc(proj, func_node.name)
                     # for block in func_node.blocks:
                     #     insns = block._project.analyses.Disassembly(ranges=[(block.addr, block.addr + block.size)],
@@ -179,7 +179,7 @@ def Search(project: angr.Project, findaddr: int, sourceaddr: int, len: int):
         # print(win_sequence)
         # Print the string that Angr wrote to stdin to follow solution_state
         # print(solution_state.posix.dumps(1))
-        print(solution_state.solver.eval(symb_vector, cast_to=bytes))
+        # print(solution_state.solver.eval(symb_vector, cast_to=bytes))
         # print(solution_state.posix.dumps(sys.stdin.fileno()))
     else:
         print('Could not find the solution')

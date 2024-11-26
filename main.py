@@ -40,7 +40,7 @@ initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
 
 symb_vector = claripy.BVS('input', 256 * 8)
-initial_state.memory.store(0x7FFFFFFFFFEFEC0, symb_vector)
+initial_state.memory.store(0x7FFFFFFFFFEFEc0, symb_vector)
 
 proj.hook(int("0x14000103a", 0), hook_reg_open_key_exw, 6)
 proj.hook(int("0x14000106f", 0), hook_reg_query_value_exw, 6)

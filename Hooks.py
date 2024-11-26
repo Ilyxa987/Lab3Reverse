@@ -14,6 +14,11 @@ def add_encode(hook, string):
     encoded.append({hook: string})
 
 
+def ret_encode():
+    global encoded
+    return encoded
+
+
 def encode(lpSubKey_ptr, filename):
     flag = 0
     binary = lief.parse(filename)
@@ -31,16 +36,15 @@ def encode(lpSubKey_ptr, filename):
 
 
 def hook_reg_open_key_exw(state):
-    hKey = state.solver.eval(state.regs.rcx)            # Первый аргумент (HKEY)
-    lpSubKey_ptr = state.solver.eval(state.regs.rdx)    # Второй аргумент (LPCWSTR)
-    ulOptions = state.solver.eval(state.regs.r8)        # Третий аргумент (DWORD)
-    samDesired = state.solver.eval(state.regs.r9)       # Четвертый аргумент (REGSAM)
+    hKey = state.solver.eval(state.regs.rcx)  # Первый аргумент (HKEY)
+    lpSubKey_ptr = state.solver.eval(state.regs.rdx)  # Второй аргумент (LPCWSTR)
+    ulOptions = state.solver.eval(state.regs.r8)  # Третий аргумент (DWORD)
+    samDesired = state.solver.eval(state.regs.r9)  # Четвертый аргумент (REGSAM)
 
     # Фиктивный дескриптор ключа (возвращаемое значение в phkResult)
     phkResult_ptr = state.mem[state.regs.rbp + 0x10].int.resolved
 
     add_encode("RegOpenKeyExW", encode(lpSubKey_ptr, "test3.exe"))
-    print(encoded)
 
     # Логирование
     print(f"Hooked RegOpenKeyExW: "
@@ -54,10 +58,10 @@ def hook_reg_open_key_exw(state):
 
 
 def hook_reg_query_value_exw(state):
-    hKey = state.solver.eval(state.regs.rcx)                # Первый аргумент (HKEY)
-    lpValueName_ptr = state.solver.eval(state.regs.rdx)     # Второй аргумент (LPCWSTR)
-    lpReserved = state.solver.eval(state.regs.r8)           # Третий аргумент
-    lpType_ptr = state.solver.eval(state.regs.r9)           # Четвертый аргумент
+    hKey = state.solver.eval(state.regs.rcx)  # Первый аргумент (HKEY)
+    lpValueName_ptr = state.solver.eval(state.regs.rdx)  # Второй аргумент (LPCWSTR)
+    lpReserved = state.solver.eval(state.regs.r8)  # Третий аргумент
+    lpType_ptr = state.solver.eval(state.regs.r9)  # Четвертый аргумент
 
     # Имитация данных о результатах запроса реестра
     lpData_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x28, 8))
@@ -116,17 +120,17 @@ def hook_reg_query_value_exw(state):
 
 
 def hook_reg_get_value_w(state):
-    hKey = state.solver.eval(state.regs.rcx)            # Первый аргумент (HKEY)
-    lpSubKey_ptr = state.solver.eval(state.regs.rdx)    # Второй аргумент (LPCWSTR)
-    lpValue_ptr = state.solver.eval(state.regs.r8)      # Третий аргумент
-    dwFlags = state.solver.eval(state.regs.r9)          # Четвертый аргумент (флаги)
+    hKey = state.solver.eval(state.regs.rcx)  # Первый аргумент (HKEY)
+    lpSubKey_ptr = state.solver.eval(state.regs.rdx)  # Второй аргумент (LPCWSTR)
+    lpValue_ptr = state.solver.eval(state.regs.r8)  # Третий аргумент
+    dwFlags = state.solver.eval(state.regs.r9)  # Четвертый аргумент (флаги)
 
     add_encode("RegGetValueW", encode(lpValue_ptr, "test3.exe"))
-    print(encoded)
 
     lpData_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x28, 8))
+    print(state.regs.rsp + 0x60)
     pcbData_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x40, 8))
-    print(hex(lpData_ptr), hex(pcbData_ptr))
+    # print(hex(lpData_ptr), hex(pcbData_ptr))
 
     # Логирование
     print(f"Hooked RegGetValueW: "
@@ -137,13 +141,12 @@ def hook_reg_get_value_w(state):
 
 
 def hook_reg_set_value_exw(state):
-    hKey = state.solver.eval(state.regs.rcx)            # Первый аргумент (HKEY)
-    lpSubKey_ptr = state.solver.eval(state.regs.rdx)    # Второй аргумент (LPCWSTR)
-    lpValue_ptr = state.solver.eval(state.regs.r8)      # Третий аргумент
-    dwFlags = state.solver.eval(state.regs.r9)          # Четвертый аргумент (флаги)
+    hKey = state.solver.eval(state.regs.rcx)  # Первый аргумент (HKEY)
+    lpSubKey_ptr = state.solver.eval(state.regs.rdx)  # Второй аргумент (LPCWSTR)
+    lpValue_ptr = state.solver.eval(state.regs.r8)  # Третий аргумент
+    dwFlags = state.solver.eval(state.regs.r9)  # Четвертый аргумент (флаги)
 
     add_encode("RegSetValueW", encode(lpSubKey_ptr, "test3.exe"))
-    print(encoded)
 
     # Извлечь дополнительные аргументы из стека
     pdwType_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x28, 8))  # Указатель на тип (REG_*)
