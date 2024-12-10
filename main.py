@@ -19,12 +19,20 @@ def hook_gets(state: angr.SimState):
     length = claripy.backends.concrete.convert(length).value
     buf_addr = claripy.backends.concrete.convert(buf_addr).value
 
+def readfile_hook(state: angr.SimState):
+    global length
+    global buf_addr
+    buf_addr = state.regs.rdx
+    length = state.regs.r8d
+    length = claripy.backends.concrete.convert(length).value
+    buf_addr = claripy.backends.concrete.convert(buf_addr).value
+
 
 import sys
 
-sources = {'gets_s': [hook_gets, 6]}
+sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6]}
 
-sick = ['puts']
+sick = ['puts', 'WriteFile']
 
 filename = input("Введите название файла:\n")
 
