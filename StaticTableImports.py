@@ -103,6 +103,7 @@ def getaddrsource(proj: angr.Project, sourcefunc: int, len: int):
         print(state.regs.edx)
         print(state.regs.eax)
         print(state.regs.r8d)
+        print('5 аргумент -', state.mem[state.regs.rsp + 0x28].uint64_t)
         proj.terminate_execution()
 
     simulation.run()
