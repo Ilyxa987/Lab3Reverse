@@ -37,8 +37,25 @@ def hook_reg_open_key_exw(state : angr.SimState):
     phkResult_ptr = state.mem[state.regs.rbp + 0x10].int.resolved
 
     # Логирование
+
+    global filename
+    namekey = ''
+    binary = lief.parse(filename)
+    flag = 0
+    for i in binary.get_content_from_virtual_address(lpSubKey_ptr, 100):
+        if i == 0:
+            if flag == 0:
+                flag = 1
+            else:
+                break
+        else:
+            flag = 0
+            namekey += chr(i)
+            #print(chr(i), end='')
+    #print()
+
     print(f"Hooked RegOpenKeyExW: "
-          f"hKey={hKey}, lpSubKey_ptr={lpSubKey_ptr}, ulOptions={ulOptions}, samDesired={samDesired}")
+          f"hKey={hKey}, lpSubKey_ptr={namekey}, ulOptions={ulOptions}, samDesired={samDesired}")
 
     # Установка фиктивного значения для phkResult (например, дескриптор 0x1234)
     state.memory.store(phkResult_ptr, claripy.BVV(0x1234, 64))  # 64-битный дескриптор
@@ -46,10 +63,73 @@ def hook_reg_open_key_exw(state : angr.SimState):
     # Возвращаемый результат (ERROR_SUCCESS = 0)
     state.regs.rax = claripy.BVV(0, 64)  # Возвращает 0 (успех)
 
+def hook_reg_query_value_exw(state):
+    hKey = state.solver.eval(state.regs.rcx)  # Первый аргумент (HKEY)
+    lpValueName_ptr = state.solver.eval(state.regs.rdx)  # Второй аргумент (LPCWSTR)
+    lpReserved = state.solver.eval(state.regs.r8)  # Третий аргумент
+    lpType_ptr = state.solver.eval(state.regs.r9)  # Четвертый аргумент
+
+    # Имитация данных о результатах запроса реестра
+    lpData_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x28, 8))
+    pcbData_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x30, 8))
+
+    global filename
+    namekey = ''
+    binary = lief.parse(filename)
+    flag = 0
+    for i in binary.get_content_from_virtual_address(lpValueName_ptr, 100):
+        if i == 0:
+            if flag == 0:
+                flag = 1
+            else:
+                break
+        else:
+            flag = 0
+            namekey += chr(i)
+
+    # Логирование
+    print(f"Hooked RegQueryValueExW: "
+          f"hKey={hex(hKey)}, lpValueName_ptr={namekey}")
+
+    state.regs.rax = claripy.BVV(0, 64)  # Возвращает 0 (успех)
+
+def hook_reg_get_value_w(state):
+    hKey = state.solver.eval(state.regs.rcx)  # Первый аргумент (HKEY)
+    lpSubKey_ptr = state.solver.eval(state.regs.rdx)  # Второй аргумент (LPCWSTR)
+    lpValue_ptr = state.solver.eval(state.regs.r8)  # Третий аргумент
+    dwFlags = state.solver.eval(state.regs.r9)  # Четвертый аргумент (флаги)
+
+    lpData_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x28, 8))
+    pcbData_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x40, 8))
+    # print(hex(lpData_ptr), hex(pcbData_ptr))
+
+    global filename
+    namekey = ''
+    binary = lief.parse(filename)
+    flag = 0
+    for i in binary.get_content_from_virtual_address(lpValue_ptr, 100):
+        if i == 0:
+            if flag == 0:
+                flag = 1
+            else:
+                break
+        else:
+            flag = 0
+            namekey += chr(i)
+
+    # Логирование
+    print(f"Hooked RegGetValueW: "
+          f"hKey={hex(hKey)}, lpSubKey_ptr={hex(lpSubKey_ptr)}, lpValue_ptr={namekey}, dwFlags={dwFlags}")
+
+    print('5 аргумент -', state.mem[state.regs.rsp + 0x28].uint64_t)
+
+    # Возвращаемый результат (ERROR_SUCCESS = 0)
+    state.regs.rax = claripy.BVV(0, 32)  # Возвращает 0 (успех)
 
 import sys
 
-sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6], 'RegOpenKeyExW' : [hook_reg_open_key_exw, 6]}
+sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6], 'RegOpenKeyExW' : [hook_reg_open_key_exw, 6], \
+            'RegQueryValueExW': [hook_reg_query_value_exw, 6], 'RegGetValueW' : [hook_reg_get_value_w, 6]}
 
 sink = ['puts', 'WriteFile']
 
@@ -85,12 +165,17 @@ for key, value in call_imports.items():
 
 print(call_imports)
 print(address_names)
-print(sink_addr)
 
 initial_state = proj.factory.call_state(0x140001000)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
 simulation = proj.factory.simgr(initial_state)
+
+#buf_addr = 0x7FFFFFFFFFEFEc0
+#length = 256
+simulation.run()
+
+print('Simvectors ready!\n')
 
 for i in range(len(sink_addr)):
     symb_vector = claripy.BVS('input', length * 8)
@@ -115,8 +200,9 @@ for i in range(len(sink_addr)):
             if finishedTracing:
                 break
         win_sequence = win_sequence[:-1]
-        print(win_sequence)
-        print(hex(sink_addr[i]), solution_state.solver.eval(symb_vector, cast_to=bytes))
+        #print(win_sequence)
+        if buf_addr != 0:
+            print(hex(sink_addr[i]), solution_state.solver.eval(symb_vector, cast_to=bytes))
     else:
-        print('Could not find the solution')
-
+        print(hex(sink_addr[i]), 'Could not find the solution or solution in func arguments')
+    print()
