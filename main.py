@@ -163,13 +163,22 @@ def hook_reg_set_value_exw(state):
 
     # Возвращаемый результат (ERROR_SUCCESS = 0)
     state.regs.rax = claripy.BVV(0, 32)  # Возвращает 0 (успех)
+
+
+def hook_getmodulefilenameW(state: angr.SimState):
+    name = state.regs.rdx
+    size = state.regs.r8
+    global length
+    global buf_addr
+    length = claripy.backends.concrete.convert(size).value
+    buf_addr = claripy.backends.concrete.convert(name).value
 import sys
 
 sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6], 'RegOpenKeyExW' : [hook_reg_open_key_exw, 6], \
             'RegQueryValueExW': [hook_reg_query_value_exw, 6], 'RegGetValueW' : [hook_reg_get_value_w, 6], \
-           'RegSetValueExW': [hook_reg_set_value_exw, 6]}
+           'RegSetValueExW': [hook_reg_set_value_exw, 6], 'GetModuleFileNameW' : [hook_getmodulefilenameW, 6]}
 
-sink = ['puts', 'WriteFile']
+sink = ['puts', 'WriteFile', 'RegSetValueExW', 'SetPriorityClass']
 
 filename = input("Введите название файла:\n")
 
@@ -191,7 +200,7 @@ for key, value in call_imports.items():
     if list(proj.loader.main_object.imports.keys())[index] in sources.keys():
         proj.hook(key, sources[list(proj.loader.main_object.imports.keys())[index]][0],
                   sources[list(proj.loader.main_object.imports.keys())[index]][1])
-    elif list(proj.loader.main_object.imports.keys())[index] in sink:
+    if list(proj.loader.main_object.imports.keys())[index] in sink:
         if list(proj.loader.main_object.imports.keys())[index] == 'puts':
             addrs = find_put_args(key, proj)
             for i in range(len(addrs)):
