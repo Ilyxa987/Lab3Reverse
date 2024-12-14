@@ -121,15 +121,53 @@ def hook_reg_get_value_w(state):
     print(f"Hooked RegGetValueW: "
           f"hKey={hex(hKey)}, lpSubKey_ptr={hex(lpSubKey_ptr)}, lpValue_ptr={namekey}, dwFlags={dwFlags}")
 
-    print('5 аргумент -', state.mem[state.regs.rsp + 0x28].uint64_t)
+    global buf_addr
+    global length
+
+    length = 64
+    buf_addr = claripy.backends.concrete.convert(state.mem[state.regs.rsp + 0x28].uint64_t.resolved).value
 
     # Возвращаемый результат (ERROR_SUCCESS = 0)
     state.regs.rax = claripy.BVV(0, 32)  # Возвращает 0 (успех)
 
+def hook_reg_set_value_exw(state):
+    hKey = state.solver.eval(state.regs.rcx)  # Первый аргумент (HKEY)
+    lpSubKey_ptr = state.solver.eval(state.regs.rdx)  # Второй аргумент (LPCWSTR)
+    lpValue_ptr = state.solver.eval(state.regs.r8)  # Третий аргумент
+    dwFlags = state.solver.eval(state.regs.r9)  # Четвертый аргумент (флаги)
+
+    # Извлечь дополнительные аргументы из стека
+    pdwType_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x28, 8))  # Указатель на тип (REG_*)
+    pvData_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x30, 8))  # Указатель на буфер данных
+    pcbData_ptr = state.solver.eval(state.memory.load(state.regs.rsp + 0x38, 8))  # Указатель на размер данных
+
+    global filename
+    namekey = ''
+    binary = lief.parse(filename)
+    flag = 0
+    for i in binary.get_content_from_virtual_address(lpSubKey_ptr, 100):
+        if i == 0:
+            if flag == 0:
+                flag = 1
+            else:
+                break
+        else:
+            flag = 0
+            namekey += chr(i)
+
+    # Логирование
+    print(
+        f"Hooked RegSetValueW: "
+        f"hKey={hex(hKey)}, lpSubKey_ptr={namekey}, lpValue_ptr={hex(lpValue_ptr)}, "
+        f"{dwFlags, pdwType_ptr, hex(pvData_ptr), hex(pcbData_ptr)}")
+
+    # Возвращаемый результат (ERROR_SUCCESS = 0)
+    state.regs.rax = claripy.BVV(0, 32)  # Возвращает 0 (успех)
 import sys
 
 sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6], 'RegOpenKeyExW' : [hook_reg_open_key_exw, 6], \
-            'RegQueryValueExW': [hook_reg_query_value_exw, 6], 'RegGetValueW' : [hook_reg_get_value_w, 6]}
+            'RegQueryValueExW': [hook_reg_query_value_exw, 6], 'RegGetValueW' : [hook_reg_get_value_w, 6], \
+           'RegSetValueExW': [hook_reg_set_value_exw, 6]}
 
 sink = ['puts', 'WriteFile']
 
