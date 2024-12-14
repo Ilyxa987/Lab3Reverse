@@ -66,18 +66,9 @@ def FindArgs(funcname:str, call_addresses:dict, proj:angr.Project):
     for key, value in call_addresses.items():
         if value == hex(addr.rebased_addr):
             for func_node in cfg.functions.values():
-                #print(hex(func_node.addr), hex(func_node.addr + func_node.size))
                 if ('print' in funcname or 'scanf' in funcname) and key > func_node.addr and key < func_node.addr + func_node.size:
                     print(hex(func_node.addr))
                     arguments = SearchFunc(proj, func_node.name)
-                    # for block in func_node.blocks:
-                    #     insns = block._project.analyses.Disassembly(ranges=[(block.addr, block.addr + block.size)],
-                    #                                                 thumb=block.thumb,
-                    #                                                 block_bytes=block.bytes).raw_result_map["instructions"]
-                    #     for i in range(len(insns.values()) - 1, -1, -1):
-                    #         #print(str(list(insns.values())[i].render()))
-                    #         if 'esi' in str(list(insns.values())[i].render()) and 'mov' in str(list(insns.values())[i].render()):
-                    #             arguments.append(str(list(insns.values())[i].render()).split('[')[2].split(']')[0])
                 else:
                     for block in func_node.blocks:
                         if key >= block.addr and key <= block.addr + block.size:
@@ -86,6 +77,28 @@ def FindArgs(funcname:str, call_addresses:dict, proj:angr.Project):
                                 if (funcname == 'puts' or funcname == 'gets_s') and 'rcx' in str(list(insns.values())[i].render()) or (funcname == 'WriteFile' or funcname == 'ReadFile') and 'rdx' in str(list(insns.values())[i].render()):
                                     arguments.append(str(list(insns.values())[i].render()).split('[')[2].split(']')[0])
     return arguments
+
+
+def find_put_args(addr, proj: angr.Project):
+    cfg = proj.analyses.CFGFast()
+    addrs = []
+    for func_node in cfg.kb.functions.values():
+        for block in func_node.blocks:
+            if addr >= block.addr and addr <= block.addr + block.size:
+                insns = \
+                block._project.analyses.Disassembly(ranges=[(block.addr, block.addr + block.size)], thumb=block.thumb,
+                                                    block_bytes=block.bytes).raw_result_map["instructions"]
+                for key, value in insns.items():
+                    if 'rcx' in str(value.render()):
+                        addrs.append(key)
+            else:
+                insns = \
+                block._project.analyses.Disassembly(ranges=[(block.addr, block.addr + block.size)], thumb=block.thumb,
+                                                    block_bytes=block.bytes).raw_result_map["instructions"]
+                for key, value in insns.items():
+                    if str(hex(addr)) in str(value.render()) and 'jmp' in str(value.render()):
+                        addrs.append(block.addr)
+    return addrs
 
 def getaddrsource(proj: angr.Project, sourcefunc: int, len: int):
     initial_state = proj.factory.call_state(0x140001000)

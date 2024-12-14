@@ -9,7 +9,7 @@ from StaticTableImports import *
 length = 0
 buf_addr = 0
 
-sick_addr = list()
+sink_addr = list()
 
 def hook_gets(state: angr.SimState):
     global length
@@ -27,12 +27,31 @@ def readfile_hook(state: angr.SimState):
     length = claripy.backends.concrete.convert(length).value
     buf_addr = claripy.backends.concrete.convert(buf_addr).value
 
+def hook_reg_open_key_exw(state : angr.SimState):
+    hKey = state.solver.eval(state.regs.rcx)  # Первый аргумент (HKEY)
+    lpSubKey_ptr = state.solver.eval(state.regs.rdx)  # Второй аргумент (LPCWSTR)
+    ulOptions = state.solver.eval(state.regs.r8)  # Третий аргумент (DWORD)
+    samDesired = state.solver.eval(state.regs.r9)  # Четвертый аргумент (REGSAM)
+
+    # Фиктивный дескриптор ключа (возвращаемое значение в phkResult)
+    phkResult_ptr = state.mem[state.regs.rbp + 0x10].int.resolved
+
+    # Логирование
+    print(f"Hooked RegOpenKeyExW: "
+          f"hKey={hKey}, lpSubKey_ptr={lpSubKey_ptr}, ulOptions={ulOptions}, samDesired={samDesired}")
+
+    # Установка фиктивного значения для phkResult (например, дескриптор 0x1234)
+    state.memory.store(phkResult_ptr, claripy.BVV(0x1234, 64))  # 64-битный дескриптор
+
+    # Возвращаемый результат (ERROR_SUCCESS = 0)
+    state.regs.rax = claripy.BVV(0, 64)  # Возвращает 0 (успех)
+
 
 import sys
 
-sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6]}
+sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6], 'RegOpenKeyExW' : [hook_reg_open_key_exw, 6]}
 
-sick = ['puts', 'WriteFile']
+sink = ['puts', 'WriteFile']
 
 filename = input("Введите название файла:\n")
 
@@ -54,28 +73,32 @@ for key, value in call_imports.items():
     if list(proj.loader.main_object.imports.keys())[index] in sources.keys():
         proj.hook(key, sources[list(proj.loader.main_object.imports.keys())[index]][0],
                   sources[list(proj.loader.main_object.imports.keys())[index]][1])
-    elif list(proj.loader.main_object.imports.keys())[index] in sick:
-        sick_addr.append(key)
+    elif list(proj.loader.main_object.imports.keys())[index] in sink:
+        if list(proj.loader.main_object.imports.keys())[index] == 'puts':
+            addrs = find_put_args(key, proj)
+            for i in range(len(addrs)):
+                sink_addr.append(addrs[i])
+        else:
+            sink_addr.append(key)
 
 """"""
 
 print(call_imports)
 print(address_names)
+print(sink_addr)
 
 initial_state = proj.factory.call_state(0x140001000)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
 simulation = proj.factory.simgr(initial_state)
 
-simulation.run()
-
-for i in range(len(sick_addr)):
+for i in range(len(sink_addr)):
     symb_vector = claripy.BVS('input', length * 8)
     initial_state.memory.store(buf_addr, symb_vector)
 
     simulation = proj.factory.simgr(initial_state)
 
-    simulation.explore(find=sick_addr[i])
+    simulation.explore(find=sink_addr[i])
 
     if simulation.found:
         solution_state = simulation.found[0]
@@ -86,13 +109,14 @@ for i in range(len(sick_addr)):
             addresses = win_block.instruction_addrs
             for address in addresses:
                 win_sequence += 't:' + hex(address) + '\n'
-                if address == sick_addr[i]:
+                if address == sink_addr[i]:
                     finishedTracing = True
                     break
             if finishedTracing:
                 break
         win_sequence = win_sequence[:-1]
-        print(hex(sick_addr[i]), solution_state.solver.eval(symb_vector, cast_to=bytes))
+        print(win_sequence)
+        print(hex(sink_addr[i]), solution_state.solver.eval(symb_vector, cast_to=bytes))
     else:
         print('Could not find the solution')
 
