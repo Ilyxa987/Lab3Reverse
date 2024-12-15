@@ -136,7 +136,7 @@ def hook_reg_get_value_w(state):
     # Возвращаемый результат (ERROR_SUCCESS = 0)
     state.regs.rax = claripy.BVV(0, 32)  # Возвращает 0 (успех)
 
-def hook_reg_set_value_exw(state):
+def hook_reg_set_value_exw(state : angr.SimState):
     hKey = state.solver.eval(state.regs.rcx)  # Первый аргумент (HKEY)
     lpSubKey_ptr = state.solver.eval(state.regs.rdx)  # Второй аргумент (LPCWSTR)
     lpValue_ptr = state.solver.eval(state.regs.r8)  # Третий аргумент
@@ -186,14 +186,35 @@ def hook_getmodulefilenameW(state: angr.SimState):
     if claripy.backends.concrete.convert(name).value not in buf_addr:
         length.append(claripy.backends.concrete.convert(size).value)
         buf_addr.append(claripy.backends.concrete.convert(name).value)
+
+
+def hook_memchr(state: angr.SimState):
+    buffer = state.solver.eval(state.regs.rcx)
+    symb = state.solver.eval(state.regs.edx)
+    size = state.solver.eval(state.regs.r8)
+    print(
+        f"Hooked memchr: "
+        f"buf={hex(buffer)}, char={chr(symb)}, size={size}")
+    for i in range(size):
+        if symb == state.solver.eval(state.mem[buffer + i * 8].uint8_t.resolved):
+            state.regs.rax = claripy.BVV(1, 64)
+            return
+    state.regs.rax = claripy.BVV(0, 64)
+
+
+def hook_writefile(state:angr.SimState):
+    print('write')
+
 import sys
 
 sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6], 'RegOpenKeyExW' : [hook_reg_open_key_exw, 6], \
             'RegQueryValueExW': [hook_reg_query_value_exw, 6], 'RegGetValueW' : [hook_reg_get_value_w, 6], \
            'RegSetValueExW': [hook_reg_set_value_exw, 6], 'GetModuleFileNameW' : [hook_getmodulefilenameW, 6], \
-           'fgets': [hook_gets, 6], 'strcpy_s': [strcpy_hook, 6]}
+           'fgets': [hook_gets, 6]}
 
-sink = ['puts', 'WriteFile', 'RegSetValueExW', 'SetPriorityClass', 'FindFirstFileW']
+sink = ['puts', 'WriteFile', 'RegSetValueExW', 'SetPriorityClass', 'FindFirstFileW', 'CloseHandle']
+
+hooks = {'strcpy_s': [strcpy_hook, 6], 'WriteFile': [hook_writefile, 6], 'memchr' : [hook_memchr, 6]}
 
 filename = input("Введите название файла:\n")
 
@@ -223,6 +244,10 @@ for key, value in call_imports.items():
                 sink_addr.append(addrs[i])
         else:
             sink_addr.append(key)
+    if list(proj.loader.main_object.imports.keys())[index] in hooks.keys():
+        hook_addr.append(key)
+        proj.hook(key, hooks[list(proj.loader.main_object.imports.keys())[index]][0],
+                  hooks[list(proj.loader.main_object.imports.keys())[index]][1])
 
 """"""
 
@@ -240,7 +265,7 @@ print('Simvectors ready!\n')
 
 # buf_addr = 0x7fffffffffefda0
 # length = 260
-
+sink_addr.append(0x140001def)
 for i in range(len(sink_addr)):
     for j in range(len(buf_addr)):
         symb_vector = claripy.BVS('input', length[j] * 8)
