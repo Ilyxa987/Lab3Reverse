@@ -200,6 +200,8 @@ def hook_memchr(state: angr.SimState):
             state.regs.rax = claripy.BVV(1, 64)
             return
     state.regs.rax = claripy.BVV(0, 64)
+    state.regs.pc = state.mem[state.regs.rsp].uint64_t.resolved
+    #state.move(state.solver.eval(state.regs.rsp))
 
 
 def hook_writefile(state:angr.SimState):
@@ -254,6 +256,8 @@ for key, value in call_imports.items():
 print(call_imports)
 print(address_names)
 
+#proj.hook(0x14000108f, hook_memchr)
+
 initial_state = proj.factory.call_state(0x140001000)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
@@ -265,7 +269,6 @@ print('Simvectors ready!\n')
 
 # buf_addr = 0x7fffffffffefda0
 # length = 260
-sink_addr.append(0x140001def)
 for i in range(len(sink_addr)):
     for j in range(len(buf_addr)):
         symb_vector = claripy.BVS('input', length[j] * 8)
