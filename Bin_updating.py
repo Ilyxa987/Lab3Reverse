@@ -1,8 +1,6 @@
 import angr
 from angr.knowledge_plugins.patches import PatchManager
 
-sources = []
-
 
 def patch_nop(addr, bytes, pm):
     patch_data = b'\x90' * bytes
