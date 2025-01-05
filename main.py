@@ -5,6 +5,7 @@ from angrutils import *
 import lief
 import claripy
 from StaticTableImports import *
+from Bin_updating import *
 
 length = []
 buf_addr = []
@@ -207,6 +208,17 @@ def hook_memchr(state: angr.SimState):
 def hook_writefile(state:angr.SimState):
     print('write')
 
+def hook_writeconsole(state : angr.SimState):
+    print('jhjh')
+    print(state.stack_pop())
+    print(state.stack_pop())
+
+def hook_readconsole(state : angr.SimState):
+    print('printf', end=' ')
+    arg = state.memory.load(state.stack_pop(), 16)
+    print(state.solver.eval(arg, cast_to=bytes))
+    print(hex(state.addr))
+
 import sys
 
 sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6], 'RegOpenKeyExW' : [hook_reg_open_key_exw, 6], \
@@ -216,7 +228,9 @@ sources = {'gets_s': [hook_gets, 6], 'ReadFile' : [readfile_hook, 6], 'RegOpenKe
 
 sink = ['puts', 'WriteFile', 'RegSetValueExW', 'SetPriorityClass', 'FindFirstFileW', 'CloseHandle']
 
-hooks = {'strcpy_s': [strcpy_hook, 6], 'WriteFile': [hook_writefile, 6], 'memchr' : [hook_memchr, 6]}
+hooks = {'strcpy_s': [strcpy_hook, 6], 'WriteFile': [hook_writefile, 6], 'memchr' : [hook_memchr, 6], 'WriteConsoleW': [hook_writeconsole, 6], 'ReadConsoleW' : [hook_readconsole, 6]}
+
+patch_hooks = {'IsDebuggerPresent': 6}
 
 filename = input("Введите название файла:\n")
 
@@ -231,25 +245,39 @@ print(lib)
 call_imports = GetStaticImportAdderess(proj)
 address_names = dict()
 
+pm = proj.kb.patches
+
 for key, value in call_imports.items():
-    index = lib.index(hex(int(value, 0)))
-    print(f"  0x{key:x} in lib", list(proj.loader.main_object.imports.keys())[index])
-    address_names.update({key: list(proj.loader.main_object.imports.keys())[index]})
-    if list(proj.loader.main_object.imports.keys())[index] in sources.keys():
-        hook_addr.append(key)
-        proj.hook(key, sources[list(proj.loader.main_object.imports.keys())[index]][0],
-                  sources[list(proj.loader.main_object.imports.keys())[index]][1])
-    if list(proj.loader.main_object.imports.keys())[index] in sink:
-        if list(proj.loader.main_object.imports.keys())[index] == 'puts':
-            addrs = find_put_args(key, proj)
-            for i in range(len(addrs)):
-                sink_addr.append(addrs[i])
-        else:
-            sink_addr.append(key)
-    if list(proj.loader.main_object.imports.keys())[index] in hooks.keys():
-        hook_addr.append(key)
-        proj.hook(key, hooks[list(proj.loader.main_object.imports.keys())[index]][0],
-                  hooks[list(proj.loader.main_object.imports.keys())[index]][1])
+    if value == 'sub_401050':
+        proj.hook(key, hook_readconsole, 5)
+        sink_addr.append(key)
+    elif value == 'sub_4010c0':
+        proj.hook(key, hook_writeconsole, 5)
+    else:
+        index = lib.index(hex(int(value, 0)))
+        print(f"  0x{key:x} in lib", list(proj.loader.main_object.imports.keys())[index])
+        address_names.update({key: list(proj.loader.main_object.imports.keys())[index]})
+        if list(proj.loader.main_object.imports.keys())[index] in sources.keys():
+            hook_addr.append(key)
+            proj.hook(key, sources[list(proj.loader.main_object.imports.keys())[index]][0],
+                      sources[list(proj.loader.main_object.imports.keys())[index]][1])
+        if list(proj.loader.main_object.imports.keys())[index] in sink:
+            if list(proj.loader.main_object.imports.keys())[index] == 'puts':
+                addrs = find_put_args(key, proj)
+                for i in range(len(addrs)):
+                    sink_addr.append(addrs[i])
+            else:
+                sink_addr.append(key)
+        if list(proj.loader.main_object.imports.keys())[index] in hooks.keys():
+            hook_addr.append(key)
+            proj.hook(key, hooks[list(proj.loader.main_object.imports.keys())[index]][0],
+                      hooks[list(proj.loader.main_object.imports.keys())[index]][1])
+        if list(proj.loader.main_object.imports.keys())[index] in patch_hooks.keys():
+            patch_nop(key, patch_hooks[list(proj.loader.main_object.imports.keys())[index]], pm)
+
+bin_save('output.exe', pm)
+print(f'{filename} patched in output.exe')
+
 
 """"""
 
@@ -259,16 +287,19 @@ print(address_names)
 #proj.hook(0x14000108f, hook_memchr)
 
 initial_state = proj.factory.call_state(0x140001000)
+#initial_state = proj.factory.call_state(0x4017d0)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_REGISTERS)
 initial_state.options.add(angr.options.SYMBOL_FILL_UNCONSTRAINED_MEMORY)
 simulation = proj.factory.simgr(initial_state)
 
+#simulation.explore(find=0x401ba6)
 simulation.run()
 
 print('Simvectors ready!\n')
 
-# buf_addr = 0x7fffffffffefda0
-# length = 260
+#buf_addr.append(0x7ffefeb0)
+#length.append(260)
+#sink_addr = [0x401b25]
 for i in range(len(sink_addr)):
     for j in range(len(buf_addr)):
         symb_vector = claripy.BVS('input', length[j] * 8)
