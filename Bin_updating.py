@@ -16,13 +16,13 @@ def bin_save(file_name, pm):
 
 
 # Загрузите бинарный файл
-project = angr.Project("test1.exe", load_options={'auto_load_libs': False})
-
-# Создайте объект PatchManager
-pm = project.kb.patches  # Получение PatchManager из проекта
-
-patch_nop(0x14000108e, 6, pm)
-
-bin_save("example.exe", pm)
-
-print("Патчинг завершен. Новый файл сохранен как output.exe.")
+# project = angr.Project("test1.exe", load_options={'auto_load_libs': False})
+#
+# # Создайте объект PatchManager
+# pm = project.kb.patches  # Получение PatchManager из проекта
+#
+# patch_nop(0x14000108e, 6, pm)
+#
+# bin_save("example.exe", pm)
+#
+# print("Патчинг завершен. Новый файл сохранен как output.exe.")
